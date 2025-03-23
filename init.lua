@@ -1,4 +1,4 @@
-vim.cmd( [[
+vim.cmd([[
 nnoremap <space>rl :so ~/.config/nvim/init.lua<CR>
 nnoremap <space>rc :e ~/.config/nvim/init.lua<CR>
 set path=$PWD/**
@@ -35,6 +35,10 @@ Plug 'williamboman/mason-lspconfig.nvim'
 Plug 'mfussenegger/nvim-lint'
 Plug 'mhartington/formatter.nvim'
 Plug 'glepnir/lspsaga.nvim'
+
+Plug 'ray-x/guihua.lua', {'do': 'cd lua/fzy && make' }
+Plug 'ray-x/go.nvim'
+
 " enhance editor
 Plug 'tomtom/tcomment_vim'
 " terminal
@@ -108,6 +112,10 @@ Plug 'theHamsta/nvim-dap-virtual-text'
 Plug 'rcarriga/nvim-dap-ui'
 Plug 'nvim-neotest/nvim-nio'
 Plug 'ray-x/lsp_signature.nvim'
+
+
+
+Plug 'MeanderingProgrammer/render-markdown.nvim'
 call plug#end()
 ]])
 
@@ -116,7 +124,6 @@ vim.cmd([[
 nnoremap <LEADER>e :NvimTreeToggle<CR>
 nnoremap <LEADER>c :clo<CR>
 
-
 " ==== nvim-telescope/telescope.nvim ====
 
 nnoremap <leader>f <cmd>Telescope find_files<cr>
@@ -124,6 +131,16 @@ nnoremap <leader>F <cmd>Telescope live_grep<cr>
 nnoremap <leader>B <cmd>Telescope buffers<cr>
 nnoremap <leader>tH <cmd>Telescope help_tags<cr>
 nnoremap <leader>p <cmd>Telescope project<cr><esc>
+
+"nnoremap <C-h> <C-w>h
+"nnoremap <C-j> <C-w>j
+"nnoremap <C-k> <C-w>k
+"nnoremap <C-l> <C-w>l
+
+
+
+nnoremap <C-p> :redraw!<CR>:nohlsearch<CR>
+
 
 " ==== Yggdroot/LeaderF ====
 
@@ -151,6 +168,7 @@ nnoremap <S-Down> :resize +1<CR>
 nnoremap <S-Left> :vertical resize -1<CR>
 nnoremap <S-Right> :vertical resize +1<CR>
 
+
 function! s:generate_compile_commands()
 if empty(glob('CMakeLists.txt'))
 echo "Can't find CMakeLists.txt"
@@ -168,13 +186,18 @@ command! -nargs=0 Gcmake :call s:generate_compile_commands()
 nnoremap <LEADER>s :Outline<CR>
 nnoremap Z zz<CR>
 ]])
-
-local mason_opts = { ensure_installed = { "lua_ls", "clangd"}}
-local util = require'lspconfig.util'
+vim.api.nvim_set_keymap('n', '<C-l>', '<Cmd>execute "normal! \\<C-f>"<CR>', { noremap = true, silent = true })
+vim.api.nvim_set_keymap('n', '<C-k>', '<Cmd>execute "normal! \\<C-y>"<CR>', { noremap = true, silent = true })
+vim.api.nvim_set_keymap('n', '<C-j>', '<Cmd>execute "normal! \\<C-e>"<CR>', { noremap = true, silent = true })
+vim.api.nvim_set_keymap('n', '<C-h>', '<Cmd>execute "normal! \\<C-b>"<CR>', { noremap = true, silent = true })
+vim.api.nvim_set_keymap('n', '<C-p>', '<Cmd>execute "normal! \\<C-i>"<CR>', { noremap = true, silent = true })
+vim.api.nvim_set_keymap('n', '<C-f>', '<Cmd>nohlsearch<CR>', { noremap = true, silent = true })
+local mason_opts = { ensure_installed = { "lua_ls", "clangd", "cmake", "gopls" } }
+local util = require 'lspconfig.util'
 local clangd_opts = {
     single_file_support = true,
     root_dir = function(fname)
-        return util.root_pattern('.vscode','build')(fname) or util.find_git_ancestor(fname) or vim.fn.getcwd()
+        return util.root_pattern('.vscode', 'build')(fname) or util.find_git_ancestor(fname) or vim.fn.getcwd()
     end,
     init_options = {
         compilationDatabaseDirectory = 'build',
@@ -185,16 +208,66 @@ local clangd_opts = {
             threads = 4,
         },
         clang = {
-            excludeArgs = { } ,
+            excludeArgs = {},
         },
         usePlaceholders = true,
     },
 }
-local lsp_signature_cfg = {}  -- add your config here
+local lsp_signature_cfg = {} -- add your config here
 
+local function resize_window(direction)
+    local win = vim.api.nvim_get_current_win()
+    local cur_width = vim.api.nvim_win_get_width(win)
+    local cur_height = vim.api.nvim_win_get_height(win)
+    if direction == 'left' then
+        if cur_width > 10 then
+            vim.api.nvim_win_set_width(win, cur_width - 1)
+        end
+    elseif direction == 'right' then
+        vim.api.nvim_win_set_width(win, cur_width + 1)
+    elseif direction == 'up' then
+        if cur_height > 10 then
+            vim.api.nvim_win_set_height(win, cur_height - 1)
+        end
+    elseif direction == 'down' then
+        vim.api.nvim_win_set_height(win, cur_height + 1)
+    end
+end
 
-vim.keymap.set({ 'i' }, '<C-k>', function()       require('lsp_signature').toggle_float_win()
-end, { silent = true, noremap = true, desc = 'toggle signature' })
+-- vim.keymap.set('n', '<S-Left>', function() resize_window('left') end, { noremap = true, silent = true })
+-- vim.keymap.set('n', '<S-Right>', function() resize_window('right') end, { noremap = true, silent = true })
+-- vim.keymap.set('n', '<S-Up>', function() resize_window('up') end, { noremap = true, silent = true })
+-- vim.keymap.set('n', '<S-Down>', function() resize_window('down') end, { noremap = true, silent = true })
+
+-- vim.keymap.set({ 'i' }, '<C-f>', function()
+--     require('lsp_signature').toggle_float_win()
+-- end, { silent = true, noremap = true, desc = 'toggle signature' })
+-- 创建一个自动命令组
+local close_qf_group = vim.api.nvim_create_augroup('CloseQfWithEsc', { clear = true })
+
+-- 定义自动命令，当进入文件类型为 'qf'（命令行历史记录窗口）的缓冲区时触发
+vim.api.nvim_create_autocmd('FileType', {
+    pattern = 'qf',
+    group = close_qf_group,
+    callback = function()
+        -- 获取当前缓冲区的编号
+        local buf = vim.api.nvim_get_current_buf()
+        -- 保存当前缓冲区原本的 ESC 键映射
+        local original_esc_mapping = vim.api.nvim_buf_get_keymap(buf, 'n')
+            [vim.api.nvim_replace_termcodes('<ESC>', true, false, true)]
+
+        -- 为当前缓冲区的普通模式设置新的 ESC 键映射
+        vim.keymap.set('n', '<ESC>', function()
+            if vim.bo.filetype == 'qf' then
+                -- 如果当前缓冲区是命令行历史记录窗口，关闭该窗口
+                vim.cmd('q')
+            elseif original_esc_mapping then
+                -- 如果原本有 ESC 键映射，执行原本的映射命令
+                vim.api.nvim_feedkeys(original_esc_mapping.rhs, 'n', false)
+            end
+        end, { buffer = buf, noremap = true })
+    end
+})
 
 local function nvim_tree_my_on_attach(bufnr)
     local api = require "nvim-tree.api"
@@ -202,9 +275,9 @@ local function nvim_tree_my_on_attach(bufnr)
         return { desc = "nvim-tree: " .. desc, buffer = bufnr, noremap = true, silent = true, nowait = true }
     end
     api.config.mappings.default_on_attach(bufnr)
-    vim.keymap.set('n', '<C-t>', api.tree.change_root_to_parent,        opts('Up'))
-    vim.keymap.set('n', '?',     api.tree.toggle_help,                  opts('Help'))
-    vim.keymap.set('n', '<ESC>',     api.tree.close,                  opts('Close'))
+    vim.keymap.set('n', '<C-t>', api.tree.change_root_to_parent, opts('Up'))
+    vim.keymap.set('n', '?', api.tree.toggle_help, opts('Help'))
+    vim.keymap.set('n', '<ESC>', api.tree.close, opts('Close'))
 end
 local nvim_tree_opt = {
     on_attach = nvim_tree_my_on_attach,
@@ -214,10 +287,10 @@ local nvim_tree_opt = {
     update_cwd = true, -- 打开时自动更新当前工作目录
 }
 local nvim_treesitter_configs = {
-    ensure_installed = { "c", "lua",   "vim", "vimdoc", "query", "cpp", "python" },
+    ensure_installed = { "c", "lua", "vim", "vimdoc", "query", "cpp", "python" },
     sync_install = false,
     auto_install = true,
-    ignore_install = {  },
+    ignore_install = {},
     highlight = {
         enable = true,
         disable = {},
@@ -225,7 +298,7 @@ local nvim_treesitter_configs = {
     },
     folding = {
         enable = true,
-        use_signs = true,     -- 使用标记
+        use_signs = true, -- 使用标记
     },
     incremental_selection = {
         enable = true,
@@ -235,7 +308,7 @@ local nvim_treesitter_configs = {
             node_decremental = "<BS>",
             scope_incremental = "<TAB>",
         },
-        is_supported = function ()
+        is_supported = function()
             local mode = vim.api.nvim_get_mode().mode
             if mode == "c" then
                 return false
@@ -292,7 +365,7 @@ local nvim_treesitter_configs = {
             },
             selection_modes = {
                 ['@parameter.outer'] = 'v', -- charwise
-                ['@function.outer'] = 'V', -- linewise
+                ['@function.outer'] = 'V',  -- linewise
                 ['@class.outer'] = '<c-v>', -- blockwise
             },
             include_surrounding_whitespace = true,
@@ -302,7 +375,7 @@ local nvim_treesitter_configs = {
 }
 
 local gitsign_opt = {
-    signs = {
+    signs                        = {
         add          = { text = '┃' },
         change       = { text = '┃' },
         delete       = { text = '_' },
@@ -310,7 +383,7 @@ local gitsign_opt = {
         changedelete = { text = '~' },
         untracked    = { text = '┆' },
     },
-    signs_staged = {
+    signs_staged                 = {
         add          = { text = '┃' },
         change       = { text = '┃' },
         delete       = { text = '_' },
@@ -318,18 +391,18 @@ local gitsign_opt = {
         changedelete = { text = '~' },
         untracked    = { text = '┆' },
     },
-    signs_staged_enable = true,
-    signcolumn = true,  -- Toggle with `:Gitsigns toggle_signs`
-    numhl      = false, -- Toggle with `:Gitsigns toggle_numhl`
-    linehl     = false, -- Toggle with `:Gitsigns toggle_linehl`
-    word_diff  = false, -- Toggle with `:Gitsigns toggle_word_diff`
-    watch_gitdir = {
+    signs_staged_enable          = true,
+    signcolumn                   = true,  -- Toggle with `:Gitsigns toggle_signs`
+    numhl                        = false, -- Toggle with `:Gitsigns toggle_numhl`
+    linehl                       = false, -- Toggle with `:Gitsigns toggle_linehl`
+    word_diff                    = false, -- Toggle with `:Gitsigns toggle_word_diff`
+    watch_gitdir                 = {
         follow_files = true
     },
-    auto_attach = true,
-    attach_to_untracked = false,
-    current_line_blame = false, -- Toggle with `:Gitsigns toggle_current_line_blame`
-    current_line_blame_opts = {
+    auto_attach                  = true,
+    attach_to_untracked          = false,
+    current_line_blame           = false, -- Toggle with `:Gitsigns toggle_current_line_blame`
+    current_line_blame_opts      = {
         virt_text = true,
         virt_text_pos = 'eol', -- 'eol' | 'overlay' | 'right_align'
         delay = 1000,
@@ -338,11 +411,11 @@ local gitsign_opt = {
         use_focus = true,
     },
     current_line_blame_formatter = '<author>, <author_time:%R> - <summary>',
-    sign_priority = 6,
-    update_debounce = 100,
-    status_formatter = nil, -- Use default
-    max_file_length = 40000, -- Disable if file is longer than this (in lines)
-    preview_config = {
+    sign_priority                = 6,
+    update_debounce              = 100,
+    status_formatter             = nil,   -- Use default
+    max_file_length              = 40000, -- Disable if file is longer than this (in lines)
+    preview_config               = {
         -- Options passed to nvim_open_win
         border = 'single',
         style = 'minimal',
@@ -350,15 +423,15 @@ local gitsign_opt = {
         row = 0,
         col = 1
     },
-    on_attach = function(bufnr)
+    on_attach                    = function(bufnr)
         local function map(mode, lhs, rhs, opts)
-            opts = vim.tbl_extend('force', {noremap = true, silent = true}, opts or {})
+            opts = vim.tbl_extend('force', { noremap = true, silent = true }, opts or {})
             vim.api.nvim_buf_set_keymap(bufnr, mode, lhs, rhs, opts)
         end
 
         -- Navigation
-        map('n', ']c', "&diff ? ']c' : '<cmd>Gitsigns next_hunk<CR>'", {expr=true})
-        map('n', '[c', "&diff ? '[c' : '<cmd>Gitsigns prev_hunk<CR>'", {expr=true})
+        map('n', ']c', "&diff ? ']c' : '<cmd>Gitsigns next_hunk<CR>'", { expr = true })
+        map('n', '[c', "&diff ? '[c' : '<cmd>Gitsigns prev_hunk<CR>'", { expr = true })
 
         -- Actions
         map('n', '<leader>tfb', '<cmd>lua require"gitsigns".blame_line{full=true}<CR>')
@@ -382,10 +455,10 @@ local telescope_opt = {
     },
 
     fzf = {
-        fuzzy = true, -- false will only do exact matching
+        fuzzy = true,                   -- false will only do exact matching
         override_generic_sorter = true, -- override the generic sorter
-        override_file_sorter = true, -- override the file sorter
-        case_mode = "smart_case" -- or "ignore_case" or "respect_case"
+        override_file_sorter = true,    -- override the file sorter
+        case_mode = "smart_case"        -- or "ignore_case" or "respect_case"
         -- the default case_mode is "smart_case"
     },
     extensions = {
@@ -407,48 +480,48 @@ local telescope_opt = {
 
 
 local treesitter_context_cfg = {
-    enable = true, -- Enable this plugin (Can be enabled/disabled later via commands)
-    multiwindow = false, -- Enable multiwindow support.
-    max_lines = 0, -- How many lines the window should span. Values <= 0 mean no limit.
-    min_window_height = 0, -- Minimum editor window height to enable context. Values <= 0 mean no limit.
+    enable = true,            -- Enable this plugin (Can be enabled/disabled later via commands)
+    multiwindow = false,      -- Enable multiwindow support.
+    max_lines = 0,            -- How many lines the window should span. Values <= 0 mean no limit.
+    min_window_height = 0,    -- Minimum editor window height to enable context. Values <= 0 mean no limit.
     line_numbers = true,
     multiline_threshold = 20, -- Maximum number of lines to show for a single context
-    trim_scope = 'outer', -- Which context lines to discard if `max_lines` is exceeded. Choices: 'inner', 'outer'
-    mode = 'cursor',  -- Line used to calculate context. Choices: 'cursor', 'topline'
+    trim_scope = 'outer',     -- Which context lines to discard if `max_lines` is exceeded. Choices: 'inner', 'outer'
+    mode = 'cursor',          -- Line used to calculate context. Choices: 'cursor', 'topline'
     -- Separator between context and content. Should be a single character string, like '-'.
     -- When separator is set, the context will only show up when there are at least 2 lines above cursorline.
     separator = nil,
-    zindex = 20, -- The Z-index of the context window
+    zindex = 20,     -- The Z-index of the context window
     on_attach = nil, -- (fun(buf: integer): bool) return false to disable attaching
 }
 
 local dashboard_opt = {
-theme = 'hyper', -- Choose a theme (e.g., 'hyper', 'doom', 'custom')
-config = {
-    week_header = {
-        enable = true, -- Enable week header
+    theme = 'hyper', -- Choose a theme (e.g., 'hyper', 'doom', 'custom')
+    config = {
+        week_header = {
+            enable = true, -- Enable week header
+        },
+        shortcut = {
+            { desc = '  Find File', group = 'Label', action = 'Telescope find_files', key = 'f' },
+            { desc = '  New File', group = 'Label', action = 'ene!', key = 'n' },
+            { desc = '  Search Text', group = 'Label', action = 'Telescope live_grep', key = 's' },
+            { desc = '  Configuration', group = 'Label', action = 'e ~/.config/nvim/init.lua', key = 'c' },
+        },
+        -- //packages = { enable = true }, -- Show installed plugins
+        footer = {}, -- Custom footer
+        project = {
+            enable = false, -- Enable recent projects
+            limit = 8, -- Number of recent projects to display
+            icon = ' ', -- Icon for projects
+            label = 'Recent Projects', -- Label for projects section
+            action = 'Telescope projects', -- Action to open a project
+        },
+        mru = {
+            limit = 8, -- Number of recently opened files to display
+            icon = ' ', -- Icon for recent files
+            label = 'Recent Files', -- Label for recent files section
+        },
     },
-    shortcut = {
-        { desc = '  Find File', group = 'Label', action = 'Telescope find_files', key = 'f' },
-        { desc = '  New File', group = 'Label', action = 'ene!', key = 'n' },
-        { desc = '  Search Text', group = 'Label', action = 'Telescope live_grep', key = 's' },
-        { desc = '  Configuration', group = 'Label', action = 'e ~/.config/nvim/init.lua', key = 'c' },
-    },
-    -- //packages = { enable = true }, -- Show installed plugins
-    footer = {}, -- Custom footer
-    project = {
-        enable = false, -- Enable recent projects
-        limit = 8, -- Number of recent projects to display
-        icon = ' ', -- Icon for projects
-        label = 'Recent Projects', -- Label for projects section
-        action = 'Telescope projects', -- Action to open a project
-    },
-    mru = {
-        limit = 8, -- Number of recently opened files to display
-        icon = ' ', -- Icon for recent files
-        label = 'Recent Files', -- Label for recent files section
-    },
-},
 }
 local get_args = function()
     -- 获取输入命令行参数
@@ -465,8 +538,9 @@ end;
 local function get_executable_from_cmake(path)
     -- 使用awk获取CMakeLists.txt文件内要生成的可执行文件的名字
     -- 有需求可以自己改成别的
-    local get_executable = 'awk "BEGIN {IGNORECASE=1} /add_executable\\s*\\([^)]+\\)/ {match(\\$0, /\\(([^\\)]+)\\)/,m);match(m[1], /([A-Za-z_]+)/, n);printf(\\"%s\\", n[1]);}" '
-    .. path .. "CMakeLists.txt"
+    local get_executable =
+        'awk "BEGIN {IGNORECASE=1} /add_executable\\s*\\([^)]+\\)/ {match(\\$0, /\\(([^\\)]+)\\)/,m);match(m[1], /([A-Za-z_]+)/, n);printf(\\"%s\\", n[1]);}" '
+        .. path .. "CMakeLists.txt"
     return vim.fn.system(get_executable)
 end
 -- 设置调试相关的字符和颜色
@@ -500,7 +574,7 @@ local dap_lldb_cfg = {
     -- 这里的name对应下面configurations中的type
     name = "lldb",
 }
-local dap_config_cpp ={
+local dap_config_cpp = {
     {
         name = "Launch file",
         type = "lldb",
@@ -533,66 +607,80 @@ local dap_v_text_cfg = {
 }
 -- 设置快捷键
 -- 检测当前窗口是否是 quickfix 窗口
-function is_quickfix_open()
-    for _, win in ipairs(vim.fn.getwininfo()) do
-        if win.quickfix == 1 then
-            return true
-        end
-    end
-    return false
-end
+-- function is_quickfix_open()
+--     for _, win in ipairs(vim.fn.getwininfo()) do
+--         if win.quickfix == 1 then
+--             return true
+--         end
+--     end
+--     return false
+-- end
+--
+-- function smart_cnext()
+--     -- 获取 quickfix 列表的信息
+--     local qf_info = vim.fn.getqflist({ idx = 0 })
+--     local cur_idx = qf_info.idx
+--     local total = #vim.fn.getqflist()
+--     if cur_idx == total then
+--         -- 已经在最后一个位置，跳转到第一个位置
+--         vim.cmd("cfirst")
+--     else
+--         -- 否则正常跳转到下一个位置
+--         vim.cmd("cnext")
+--     end
+-- end
+--
+-- -- 自定义函数包装 cprev
+-- function smart_cprev()
+--     -- 获取 quickfix 列表的信息
+--     local qf_info = vim.fn.getqflist({ idx = 0 })
+--     local cur_idx = qf_info.idx
+--     if cur_idx == 1 then
+--         -- 已经在第一个位置，跳转到最后一个位置
+--         vim.cmd("clast")
+--     else
+--         -- 否则正常跳转到上一个位置
+--         vim.cmd("cprev")
+--     end
+-- end
 
-function smart_cnext()
-    -- 获取 quickfix 列表的信息
-    local qf_info = vim.fn.getqflist({ idx = 0 })
-    local cur_idx = qf_info.idx
-    local total = #vim.fn.getqflist()
-    if cur_idx == total then
-        -- 已经在最后一个位置，跳转到第一个位置
-        vim.cmd("cfirst")
-    else
-        -- 否则正常跳转到下一个位置
-        vim.cmd("cnext")
-    end
-end
-
--- 自定义函数包装 cprev
-function smart_cprev()
-    -- 获取 quickfix 列表的信息
-    local qf_info = vim.fn.getqflist({ idx = 0 })
-    local cur_idx = qf_info.idx
-    if cur_idx == 1 then
-        -- 已经在第一个位置，跳转到最后一个位置
-        vim.cmd("clast")
-    else
-        -- 否则正常跳转到上一个位置
-        vim.cmd("cprev")
-    end
-end
 -- 修改 C-j/C-k 的行为
-function navigate_and_preview(step)
-    if is_quickfix_open() then
-        -- 如果在 quickfix 窗口中，正常导航
-        if step > 0 then
-            smart_cnext()
-        else
-            smart_cprev()
-        end
-    else
+-- function navigate_and_preview(step)
+--     if is_quickfix_open() then
+--         -- 如果在 quickfix 窗口中，正常导航
+--         if step > 0 then
+--             smart_cnext()
+--         else
+--             smart_cprev()
+--         end
+--     else
+--
+--     end
+-- end
 
-    end
-end
-local saga_setup = {
-    code_action_lightbulb = {
+local saga_opt = {
+    lightbulb = {
         enable = false, -- 关闭光标悬停时的动作提示
+        enable_in_insert = false,
     },
-    symbol_in_winbar = {
-        enable = false, -- 保持界面简洁，关闭顶部符号显示
+    -- symbol_in_winbar = {
+    --     enable = false, -- 保持界面简洁，关闭顶部符号显示
+    -- },
+    code_action = {
+        keys = {
+            -- 定义 Esc 键关闭代码操作窗口
+            quit = '<Esc>',
+            exec = '<CR>'
+
+        }
     },
+    diagnostic = {
+        diagnostic_only_current = false
+    }
 }
 local outline_opts = {
     keymaps = { -- These keymaps can be a string or a table for multiple keys
-        close = {"<Esc>", "q"},
+        close = { "<Esc>", "q" },
         goto_location = "<Cr>",
         focus_location = "o",
         hover_symbol = "<C-space>",
@@ -617,60 +705,71 @@ local sc_opt = {
 local util = require "formatter.util"
 
 local formatter_opt = {
-  logging = true,
-  log_level = vim.log.levels.WARN,
-  filetype = {
-    c = {
-      function()
-        return {
-          exe = "clang-format",
-          args = {"--style=Google", "--assume-filename=".. vim.fn.expand('%:t')},
-          stdin = true
+    logging = true,
+    log_level = vim.log.levels.WARN,
+    filetype = {
+        c = {
+            function()
+                return {
+                    exe = "clang-format",
+                    args = { "--style=Google", "--assume-filename=" .. vim.fn.expand('%:t') },
+                    stdin = true
+                }
+            end
+        },
+        cpp = {
+            -- 使用 clang-format 对 C++ 语言文件进行格式化
+            function()
+                return {
+                    exe = "clang-format",
+                    args = { "--assume-filename=" .. vim.fn.expand('%:t') },
+                    stdin = true
+                }
+            end
+        },
+        lua = {
+            require("formatter.filetypes.lua").stylua,
+            function()
+                if util.get_current_buffer_file_name() == "special.lua" then
+                    return nil
+                end
+                return {
+                    exe = "stylua",
+                    args = {
+                        "--search-parent-directories",
+                        "--stdin-filepath",
+                        util.escape_path(util.get_current_buffer_file_path()),
+                        "--",
+                        "-",
+                    },
+                    stdin = true,
+                }
+            end
+        },
+        go = {
+            function()
+                return {
+                    -- 使用 gofmt 命令进行格式化
+                    exe = "gofmt",
+                    -- 格式化的参数
+                    args = {},
+                    -- 输入类型
+                    stdin = true
+                }
+            end
         }
-      end
-    },
-    cpp = {
-      -- 使用 clang-format 对 C++ 语言文件进行格式化
-      function()
-        return {
-          exe = "clang-format",
-          args = { "--assume-filename=".. vim.fn.expand('%:t')},
-          stdin = true
-        }
-      end
-    },
-    lua = {
-      require("formatter.filetypes.lua").stylua,
-      function()
-        if util.get_current_buffer_file_name() == "special.lua" then
-          return nil
-        end
-        return {
-          exe = "stylua",
-          args = {
-            "--search-parent-directories",
-            "--stdin-filepath",
-            util.escape_path(util.get_current_buffer_file_path()),
-            "--",
-            "-",
-          },
-          stdin = true,
-        }
-      end
-    },
-    ["*"] = {
-      require("formatter.filetypes.any").remove_trailing_whitespace,
     }
-  }
 }
 require("mason").setup()
 require("mason-lspconfig").setup(mason_opts)
-require'lspconfig'.lua_ls.setup{}
-require'lspconfig'.clangd.setup (clangd_opts)
+require 'lspconfig'.lua_ls.setup {}
+require 'lspconfig'.clangd.setup(clangd_opts)
+require 'lspconfig'.cmake.setup {}
+-- require 'lspconfig'.gopls.setup {}
 require "lsp_signature".setup(lsp_signature_cfg)
 require("nvim-tree").setup(nvim_tree_opt)
 
-require'nvim-treesitter.configs'.setup(nvim_treesitter_configs)
+require 'nvim-treesitter.configs'.setup(nvim_treesitter_configs)
 require('nvim-surround').setup()
 require('Comment').setup()
 require("toggleterm").setup(toggleterm_opt)
@@ -684,15 +783,18 @@ require('lualine').setup()
 require('nvim-autopairs').setup()
 require('symbol-usage').setup()
 require('symbol-usage').toggle_globally()
-require('lspsaga').setup(saga_setup)
-require("formatter").setup(formatter_opt) 
+require('lspsaga').setup(saga_opt)
 
+-- require 'navigator'.setup()
+require("formatter").setup(formatter_opt)
 
 local dap = require('dap')
 dap.runInTerminal = true
 dap.adapters.lldb = dap_lldb_cfg
 dap.configurations.cpp = dap_config_cpp
 dap.configurations.c = dap.configurations.cpp
+
+
 require("dapui").setup()
 require("outline").setup(outline_opts)
 require("nvim-dap-virtual-text").setup(dap_v_text_cfg)
@@ -728,17 +830,17 @@ end
 
 
 
-local cmp = require'cmp'
+local cmp = require 'cmp'
 cmp.setup({
     snippet = {
         -- REQUIRED - you must specify a snippet engine
-      expand = function(args)
-        vim.fn["vsnip#anonymous"](args.body) -- For `vsnip` users.
-        -- require('luasnip').lsp_expand(args.body) -- For `luasnip` users.
-        -- require('snippy').expand_snippet(args.body) -- For `snippy` users.
-        -- vim.fn["UltiSnips#Anon"](args.body) -- For `ultisnips` users.
-        -- vim.snippet.expand(args.body) -- For native neovim snippets (Neovim v0.10+)
-      end,
+        expand = function(args)
+            vim.fn["vsnip#anonymous"](args.body) -- For `vsnip` users.
+            -- require('luasnip').lsp_expand(args.body) -- For `luasnip` users.
+            -- require('snippy').expand_snippet(args.body) -- For `snippy` users.
+            -- vim.fn["UltiSnips#Anon"](args.body) -- For `ultisnips` users.
+            -- vim.snippet.expand(args.body) -- For native neovim snippets (Neovim v0.10+)
+        end,
     },
     window = {
         completion = cmp.config.window.bordered({
@@ -765,12 +867,12 @@ cmp.setup({
     }),
     sources = cmp.config.sources({
         { name = 'nvim_lsp' },
-          { name = 'vsnip' }, -- For vsnip users.
+        { name = 'vsnip' }, -- For vsnip users.
         -- { name = 'ultisnips' }, -- For ultisnips users.
         -- { name = 'snippy' }, -- For snippy users.
     }, {
-            { name = 'buffer' },
-        }),
+        { name = 'buffer' },
+    }),
 })
 
 
@@ -787,8 +889,8 @@ cmp.setup.cmdline(':', {
     sources = cmp.config.sources({
         { name = 'path' }
     }, {
-            { name = 'cmdline' }
-        }),
+        { name = 'cmdline' }
+    }),
     matching = { disallow_symbol_nonprefix_matching = false }
 })
 
@@ -809,15 +911,15 @@ cmp.setup {
                 -- prevent the popup from showing more than provided characters (e.g 50 will not show more than 50 characters)
                 -- can also be a function to dynamically calculate max width such as
                 -- menu = function() return math.floor(0.45 * vim.o.columns) end,
-                menu = 50, -- leading text (labelDetails)
-                abbr = 50, -- actual suggestion item
+                menu = 50,            -- leading text (labelDetails)
+                abbr = 50,            -- actual suggestion item
             },
-            ellipsis_char = '...', -- when popup menu exceed maxwidth, the truncated part would show ellipsis_char instead (must define maxwidth first)
+            ellipsis_char = '...',    -- when popup menu exceed maxwidth, the truncated part would show ellipsis_char instead (must define maxwidth first)
             show_labelDetails = true, -- show labelDetails in menu. Disabled by default
 
             -- The function below will be called before any actual modifications from lspkind
             -- so that you can provide more controls on popup customization. (See [#30](https://github.com/onsails/lspkind-nvim/pull/30))
-            before = function (entry, vim_item)
+            before = function(entry, vim_item)
                 -- ...
                 return vim_item
             end
@@ -827,26 +929,18 @@ cmp.setup {
 
 
 -- 配置诊断跳转（与 coc 配置的 [g 和 ]g 保持一致）
-vim.keymap.set('n', '[g', '<cmd>Lspsaga diagnostic_jump_prev<CR>', { silent = true })
-vim.keymap.set('n', ']g', '<cmd>Lspsaga diagnostic_jump_next<CR>', { silent = true })
 
 -- 配置重命名（与 coc 的 <leader>rn 保持一致）
-vim.keymap.set('n', '<leader>rn', '<cmd>Lspsaga rename<CR>', { silent = true })
 
 vim.keymap.set('x', '<leader>=', function()
     vim.lsp.buf.format({ async = true })
 end, { silent = true })
 
-
-
--- 配置诊断列表（与 coc 的 <leader>d 保持一致）
-vim.keymap.set('n', '<leader>d', '<cmd>Lspsaga show_buf_diagnostics<CR>', { silent = true })
-
--- 快速修复（与 coc 的 <leader>qf 保持一致）
+vim.keymap.set('n', '[g', '<cmd>Lspsaga diagnostic_jump_prev<CR>', { silent = true })
+vim.keymap.set('n', ']g', '<cmd>Lspsaga diagnostic_jump_next<CR>', { silent = true })
+vim.keymap.set('n', '<leader>rn', '<cmd>Lspsaga rename<CR>', { silent = true })
 vim.keymap.set('n', '<leader>qf', '<cmd>Lspsaga code_action<CR>', { silent = true })
-
-
--- 跳转到定义、类型定义、实现和引用（与 coc 的 gd、gy、gi、gr 保持一致）
+vim.keymap.set('n', '<leader>d', '<cmd>Lspsaga show_buf_diagnostics<CR>', { silent = true })
 vim.keymap.set('n', 'gd', '<cmd>Lspsaga goto_definition<CR>', { silent = true })
 vim.keymap.set('n', 'gD', '<cmd>tab split | Lspsaga goto_definition<CR>', { silent = true })
 vim.keymap.set('n', 'gy', '<cmd>Lspsaga peek_type_definition<CR>', { silent = true })
@@ -855,23 +949,23 @@ vim.keymap.set('n', 'gi', '<cmd>lua vim.lsp.buf.implementation()<CR>', { silent 
 -- 定义函数对象和类对象的文本对象（与 coc 的 if、af、ic、ac 保持一致）
 
 
-vim.keymap.set('n', '<Esc>', function()
-    if is_quickfix_open() then
-        vim.cmd('cclose')
-    else
-        -- 可以添加其他操作，例如不执行任何操作，或者执行其他命令
-        -- 例如：vim.cmd('echo "Function returned false"')
-    end
-end, { noremap = true, silent = true })
+-- vim.keymap.set('n', '<Esc>', function()
+--     if is_quickfix_open() then
+--         vim.cmd('cclose')
+--     else
+--         -- 可以添加其他操作，例如不执行任何操作，或者执行其他命令
+--         -- 例如：vim.cmd('echo "Function returned false"')
+--     end
+-- end, { noremap = true, silent = true })
 -- 更新快捷键映射
-vim.api.nvim_set_keymap("n", "<C-j>", "<cmd>lua navigate_and_preview(1)<CR>", { noremap = true, silent = true })
-vim.api.nvim_set_keymap("n", "<C-k>", "<cmd>lua navigate_and_preview(-1)<CR>", { noremap = true, silent = true })
+vim.api.nvim_set_keymap("n", "<TAB>", "<cmd>lua navigate_and_preview(1)<CR>", { noremap = true, silent = true })
+vim.api.nvim_set_keymap("n", "<S-TAB>", "<cmd>lua navigate_and_preview(-1)<CR>", { noremap = true, silent = true })
 -- 设置函数：调用 vim.lsp.buf.references 并填充 quickfix 列表
 vim.api.nvim_set_keymap("n", "gr", "<cmd>lua vim.lsp.buf.references()<CR>", { noremap = true, silent = true })
 
 
 require('lint').linters_by_ft = {
-  markdown = {'vale'},
+    markdown = { 'vale' },
 }
 
 --
@@ -903,7 +997,7 @@ local lint = require('lint')
 
 -- 定义一个函数来切换 lint 的启用状态
 local function toggle_lint()
-    lint.try_lint({"cpplint"}) -- 如果 lint 是启用的，尝试进行代码检查
+    lint.try_lint({ "cpplint" }) -- 如果 lint 是启用的，尝试进行代码检查
 end
 local function toggle_lint_dis()
     lint.try_lint() -- 如果 lint 是启用的，尝试进行代码检查
@@ -914,3 +1008,30 @@ vim.api.nvim_create_user_command('Lint', toggle_lint, {})
 vim.api.nvim_create_user_command('LintDisable', toggle_lint_dis, {})
 vim.api.nvim_create_user_command('Q', 'qa!', {})
 vim.api.nvim_create_user_command('W', 'wqa', {})
+
+
+
+require('render-markdown').setup({})
+-- 恢复 <C - i> 的默认功能
+vim.cmd([[
+nnoremap <M-o> <C-i>
+nnoremap <M-i> <C-o>
+]])
+local format_sync_grp = vim.api.nvim_create_augroup("GoFormat", {})
+vim.api.nvim_create_autocmd("BufWritePre", {
+    pattern = "*.go",
+    callback = function()
+        require('go.format').goimports()
+    end,
+    group = format_sync_grp,
+})
+
+require('go').setup{
+  lsp_cfg = false,
+  -- other setups...
+  lsp_keymaps = false
+}
+local cfg = require'go.lsp'.config() -- config() return the go.nvim gopls setup
+
+require('lspconfig').gopls.setup(cfg)
+
